@@ -1,258 +1,248 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { RefreshCw, Send, Loader, Info } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Empathy Engine - Dedicated Support</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide-react@latest/dist/lucide-react.umd.js"></script>
+    <style>
+        body { font-family: "Inter", sans-serif; height: 100vh; margin: 0; }
+        #root { height: 100%; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-// Use gemini-2.5-flash-preview-09-2025 for text generation
-const MODEL_NAME = 'gemini-2.5-flash-preview-09-2025';
-
-// UPDATED System instruction to implement the specific step-by-step trauma inquiry AND be much more supportive overall
-const SYSTEM_PROMPT = `You are 'The Empathy Engine,' a non-judgmental, supportive, and reflective conversational AI. You radiate genuine warmth, empathy, and absolute non-judgment. Your primary goal is to provide emotional safety, deep validation, and help the user process emotions and find constructive, positive paths forward.
-**You are NOT a substitute for a licensed therapist, counselor, or professional mental health services.**
-
-General Guidelines (Always Follow):
-1. **Deep Validation:** Always start by validating the user's current feelings, emphasizing their resilience and strength in seeking help. Use language that is nurturing and encouraging.
-2. Emphasize evidence-based approaches (mindfulness, CBT reframing, self-compassion).
-3. Keep your responses concise, typically 3-5 sentences long.
-
-Specific Instructions for Avoidant Attachment Topic (CRITICAL SEQUENCE):
-1. Initial Choice: If the user indicates they want to discuss avoidant attachment, your next response must be to validate their courage and offer the choice: "**Would you like me to give a list of common reasons for avoidant attachment, or would you like to tell me what you feel might be the cause?**"
-
-2. List Sequence Initiation (If user asks for the list):
-   - You MUST start by only presenting the FIRST common reason. The reasons are:
-     a) **Reason 1 (Emotional Suppression):** Caregivers discouraged or ignored emotional expression, teaching the child to rely only on themselves.
-     b) **Reason 2 (Forced Independence):** The child was forced into self-sufficiency too early, equating closeness with weakness or burden.
-     c) **Reason 3 (Inconsistent Closeness):** Affection or closeness was inconsistent, leading the child to preemptively distance themselves to avoid inevitable disappointment or withdrawal.
-   - After stating only the first reason (Reason 1), you MUST end your response with the exact question: "**Does this pattern resonate with your experience? We can pause and talk about it, or I can share the next common reason.**"
-
-3. Turn-by-Turn Response Management:
-   - If the user's response indicates they want to **talk about that specific reason** (e.g., "Yes," "Let's talk about that," "It resonates"):
-     - Respond with deep validation (e.g., "Thank you for sharing that; it takes courage.") and gently pivot the discussion towards acceptance, self-compassion, and reframing the pattern as a survival mechanism. Do not give the next list item.
-   - If the user's response indicates they want to **keep going** (e.g., "Next," "Continue," "No, tell me the others"):
-     - Respond by providing the next reason (Reason 2, then Reason 3), followed immediately by the prompt: "**Does this pattern resonate with your experience? We can pause and talk about it, or I can share the next common reason.**"
-
-4. Completion and Transition:
-   - After the third reason is discussed (or the user explicitly says they are done with the list), gently pivot the conversation toward **current management and growth**. Focus on strategies that help them feel safer and better about themselves and their relationships, such as establishing healthy boundaries and practicing self-compassion.`;
-
-// Exponential Backoff Implementation
-const MAX_RETRIES = 3;
-const initialApiKey = ""; // This will be automatically handled by the environment
-
-// Helper function to generate the initial AI prompt
-const generateInitialPrompt = () => ({
-  role: 'model',
-  text: "Welcome. I'm The Empathy Engine, and I'm here to listen without judgment. We can talk about general feelings and mental well-being, or we can focus specifically on relationship patterns. For example, would you like to discuss your general **mental health** today, or perhaps explore feelings related to **avoidant attachment** and your relationships? Just let me know which direction feels right for you.",
-  timestamp: new Date().toLocaleTimeString(),
-});
-
-// Utility for handling chat history persistence (using sessionStorage for this single-file example)
-const loadChatHistory = () => {
-  try {
-    const history = sessionStorage.getItem('empathyEngineChat');
-    const parsedHistory = history ? JSON.parse(history) : [];
-
-    // If history is empty, inject the initial AI prompt
-    if (parsedHistory.length === 0) {
-      return [generateInitialPrompt()];
-    }
-
-    return parsedHistory;
-  } catch (error) {
-    console.error("Error loading chat history:", error);
-    // Return initial prompt on error too
-    return [generateInitialPrompt()];
-  }
-};
-
-const saveChatHistory = (history) => {
-  try {
-    sessionStorage.setItem('empathyEngineChat', JSON.stringify(history));
-  } catch (error) {
-    console.error("Error saving chat history:", error);
-  }
-};
-
-const App = () => {
-  // Messages now initializes with the prompt if history is empty
-  const [messages, setMessages] = useState(loadChatHistory);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const chatEndRef = useRef(null);
-
-  // Scroll to the latest message whenever messages update
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    saveChatHistory(messages);
-  }, [messages]);
-
-  const addMessage = useCallback((role, text) => {
-    const newMessage = { role, text, timestamp: new Date().toLocaleTimeString() };
-    setMessages(prev => [...prev, newMessage]);
-    return newMessage;
-  }, []);
-
-  const resetChat = () => {
-    // IMPORTANT: Using custom modal/confirmation instead of alert/confirm
-    if (window.confirm("Are you sure you want to clear the entire conversation?")) {
-        // Reset messages to include only the new initial prompt
-        setMessages([generateInitialPrompt()]);
-        sessionStorage.removeItem('empathyEngineChat');
-    }
-  };
-
-  const handleFetchWithRetry = async (url, options) => {
-    let lastError = null;
-    for (let i = 0; i < MAX_RETRIES; i++) {
-      try {
-        const response = await fetch(url, options);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+        
+        const getLucideComponent = (name) => {
+            const Lucide = window.LucideReact || window.lucideReact || window.lucide;
+            if (Lucide && Lucide[name]) return Lucide[name];
+            const FallbackIcon = ({ className = "" }) => (
+                <span className={`${className} inline-block w-4 h-4 align-middle text-gray-500`}>
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-full h-full">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </span>
+            );
+            return FallbackIcon;
         }
-        return await response.json();
-      } catch (error) {
-        lastError = error;
-        const delay = Math.pow(2, i) * 1000; // Exponential backoff: 1s, 2s, 4s
-        if (i < MAX_RETRIES - 1) {
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-    throw new Error(`Failed to fetch content after ${MAX_RETRIES} attempts. Last error: ${lastError?.message || 'Unknown error'}`);
-  };
 
-  const sendMessage = async (e) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+        const RefreshCw = getLucideComponent('RefreshCw');
+        const Send = getLucideComponent('Send');
+        const Loader = getLucideComponent('Loader');
+        const Info = getLucideComponent('Info');
 
-    const userText = input.trim();
-    setInput('');
-    addMessage('user', userText);
-    setIsLoading(true);
+        const MAX_RETRIES = 3;
 
-    const apiKey = initialApiKey;
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+        const SYSTEM_PROMPT = `You are 'The Empathy Engine,' a non-judgmental, deeply supportive, and reflective conversational AI. Your core persona is built on absolute empathy, warmth, and non-judgment. Your primary goal is to provide a safe space for the user to express their thoughts and feelings and offer constructive, positive perspectives.
 
-    try {
-      // Prepare the history for the API call (Gemini format)
-      // The history includes the initial prompt
-      const chatHistoryForAPI = messages.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.text }],
-      }));
+        General Guidelines (Always Follow):
+        1. **Deep Validation:** Always begin by validating the user's feelings and experiences. Acknowledge their courage in opening up and seeking help.
+        2. **Safety First:** You must always state that you are NOT a substitute for a licensed therapist or mental health professional.
+        3. **Focus on Reflection:** Gently encourage reflection and help the user explore their emotions and experiences further using techniques like reframing and self-compassion.
+        4. **Keep it Concise:** Keep your responses kind, encouraging, and concise, typically 3-4 sentences long.`;
 
-      const payload = {
-        contents: [
-            ...chatHistoryForAPI,
-            { role: 'user', parts: [{ text: userText }] }
-        ],
-        // System instruction is key to defining the AI's behavior
-        systemInstruction: {
-            parts: [{ text: SYSTEM_PROMPT }]
-        },
-      };
+        const generateInitialPrompt = () => ({
+            role: 'model',
+            text: "Welcome. I'm The Empathy Engine, and I'm here to listen without judgment. We can talk about general feelings and mental well-being, or focus on a specific concern. Just let me know what feels right for you to discuss today.",
+            timestamp: new Date().toLocaleTimeString(),
+        });
 
-      const result = await handleFetchWithRetry(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+        const loadChatHistory = () => {
+            try {
+                const history = sessionStorage.getItem('empathyEngineChat');
+                const parsedHistory = history ? JSON.parse(history) : [];
+                if (parsedHistory.length === 0) return [generateInitialPrompt()];
+                return parsedHistory;
+            } catch (error) {
+                console.error("Error loading chat history:", error);
+                return [generateInitialPrompt()];
+            }
+        };
 
-      const geminiResponseText = result.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't process that response right now. Please try again.";
-      addMessage('model', geminiResponseText);
+        const saveChatHistory = (history) => {
+            try {
+                sessionStorage.setItem('empathyEngineChat', JSON.stringify(history));
+            } catch (error) {
+                console.error("Error saving chat history:", error);
+            }
+        };
 
-    } catch (error) {
-      console.error("API Call Error:", error);
-      addMessage('model', 'I apologize, but I encountered an error while processing your request. Please check your network connection or try resetting the chat.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        const App = () => {
+            const [messages, setMessages] = useState(loadChatHistory);
+            const [input, setInput] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const chatEndRef = useRef(null);
 
-  const MessageBubble = ({ role, text, timestamp }) => (
-    <div className={`flex w-full ${role === 'user' ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-3/4 p-3 rounded-lg shadow-md mb-4 flex flex-col ${
-        role === 'user'
-          ? 'bg-blue-500 text-white rounded-br-none'
-          : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'
-      }`}>
-        <p className="text-sm break-words whitespace-pre-wrap">{text}</p>
-        <span className={`text-xs mt-1 self-end ${role === 'user' ? 'text-blue-200' : 'text-gray-500'}`}>
-            {timestamp}
-        </span>
-      </div>
-    </div>
-  );
+            useEffect(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                saveChatHistory(messages);
+            }, [messages]);
 
-  return (
-    <div className="flex flex-col h-screen bg-gray-50 font-sans antialiased">
-      {/* Header */}
-      <header className="flex-shrink-0 bg-blue-600 text-white shadow-lg p-4 flex justify-between items-center sticky top-0 z-10">
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
-          The Empathy Engine
-        </h1>
-        <button
-          onClick={resetChat}
-          className="flex items-center text-sm bg-blue-700 hover:bg-blue-800 transition duration-150 rounded-full px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          aria-label="Start a new chat"
-          title="Start New Session"
-        >
-          <RefreshCw className="w-4 h-4 mr-1" />
-          New Session
-        </button>
-      </header>
+            const addMessage = useCallback((role, text) => {
+                const newMessage = { role, text, timestamp: new Date().toLocaleTimeString() };
+                setMessages(prev => [...prev, newMessage]);
+                return newMessage;
+            }, []);
 
-      {/* Chat Area */}
-      <main className="flex-grow overflow-y-auto p-4 md:p-6 pb-28 space-y-4">
-        {/* Render all messages, starting with the initial prompt */}
-        {messages.map((msg, index) => (
-            <MessageBubble key={index} {...msg} />
-        ))}
-        {isLoading && (
-            <div className="flex justify-start">
-                <div className="bg-white text-gray-800 rounded-lg p-3 shadow-md mb-4 border border-gray-100 flex items-center">
-                    <Loader className="w-5 h-5 animate-spin text-blue-500 mr-2" />
-                    <p className="text-sm">Engine reflecting...</p>
+            const resetChat = () => {
+                const isConfirmed = window.confirm("Are you sure you want to clear the entire conversation?");
+                if (isConfirmed) {
+                    setMessages([generateInitialPrompt()]);
+                    sessionStorage.removeItem('empathyEngineChat');
+                }
+            };
+
+            const handleFetchWithRetry = async (url, options) => {
+                let lastError = null;
+                for (let i = 0; i < MAX_RETRIES; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return await response.json();
+                    } catch (error) {
+                        lastError = error;
+                        const delay = Math.pow(2, i) * 1000;
+                        if (i < MAX_RETRIES - 1) {
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                        }
+                    }
+                }
+                throw new Error(`Failed after ${MAX_RETRIES} attempts. Last error: ${lastError?.message || 'Unknown error'}`);
+            };
+
+            const sendMessage = async (e) => {
+                e.preventDefault();
+                if (!input.trim() || isLoading) return;
+
+                const userText = input.trim();
+                setInput('');
+                addMessage('user', userText);
+                setIsLoading(true);
+
+                try {
+                    const chatHistoryForAPI = messages.map(msg => ({
+                        role: msg.role === 'user' ? 'user' : 'model',
+                        parts: [{ text: msg.text }],
+                    }));
+
+                    const payload = {
+                        messages: [
+                            ...chatHistoryForAPI,
+                            { role: 'user', parts: [{ text: userText }] }
+                        ],
+                        systemPrompt: SYSTEM_PROMPT
+                    };
+
+                    // Call YOUR backend function instead of Google API directly
+                    const result = await handleFetchWithRetry('/.netlify/functions/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const geminiResponseText = result.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't process that response right now. Please try again.";
+                    addMessage('model', geminiResponseText);
+
+                } catch (error) {
+                    console.error("API Call Error:", error);
+                    addMessage('model', 'I apologize, but I encountered an error while processing your request. Please try again in a moment.');
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const MessageBubble = ({ role, text, timestamp }) => (
+                <div className={`flex w-full ${role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-3/4 p-3 rounded-lg shadow-md mb-4 flex flex-col ${
+                        role === 'user'
+                            ? 'bg-blue-500 text-white rounded-br-none'
+                            : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'
+                    }`}>
+                        <p className="text-sm break-words whitespace-pre-wrap">{text}</p>
+                        <span className={`text-xs mt-1 self-end ${role === 'user' ? 'text-blue-200' : 'text-gray-500'}`}>
+                            {timestamp}
+                        </span>
+                    </div>
                 </div>
-            </div>
-        )}
-        <div ref={chatEndRef} />
-      </main>
+            );
 
-      {/* Input and Disclaimer Footer */}
-      <footer className="flex-shrink-0 bg-white border-t border-gray-200 p-4 sticky bottom-0 z-10">
+            return (
+                <div className="flex flex-col h-screen bg-gray-50 font-sans antialiased">
+                    <header className="flex-shrink-0 bg-blue-600 text-white shadow-lg p-4 flex justify-between items-center sticky top-0 z-10">
+                        <h1 className="text-xl font-bold tracking-tight md:text-2xl">
+                            The Empathy Engine
+                        </h1>
+                        <button
+                            onClick={resetChat}
+                            className="flex items-center text-sm bg-blue-700 hover:bg-blue-800 transition duration-150 rounded-full px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            aria-label="Start a new chat"
+                            title="Start New Session"
+                        >
+                            <RefreshCw className="w-4 h-4 mr-1" />
+                            New Session
+                        </button>
+                    </header>
 
-        {/* Disclaimer */}
-        <div className="bg-yellow-50 text-yellow-800 p-3 rounded-lg mb-4 text-xs flex items-start shadow-inner">
-            <Info className="w-4 h-4 flex-shrink-0 mt-0.5 mr-2 text-yellow-600" />
-            <div>
-                <strong className="font-semibold">Important Disclaimer:</strong> This AI is for **informational and recreational use only**. It is not a licensed therapist, counselor, or medical professional. If you are experiencing a mental health crisis, please seek professional help immediately. Data transmission is secured via HTTPS.
-            </div>
-        </div>
+                    <main className="flex-grow overflow-y-auto p-4 md:p-6 pb-28 space-y-4">
+                        {messages.map((msg, index) => (
+                            <MessageBubble key={index} {...msg} />
+                        ))}
+                        {isLoading && (
+                            <div className="flex justify-start">
+                                <div className="bg-white text-gray-800 rounded-lg p-3 shadow-md mb-4 border border-gray-100 flex items-center">
+                                    <Loader className="w-5 h-5 animate-spin text-blue-500 mr-2" />
+                                    <p className="text-sm">Engine reflecting...</p>
+                                </div>
+                            </div>
+                        )}
+                        <div ref={chatEndRef} />
+                    </main>
 
-        {/* Input Form */}
-        <form onSubmit={sendMessage} className="flex space-x-3">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            disabled={isLoading}
-            placeholder="Tell me what's on your mind..."
-            className="flex-grow p-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || isLoading}
-            className={`flex items-center justify-center w-12 h-12 rounded-full text-white transition duration-150 ${
-              !input.trim() || isLoading
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-lg'
-            }`}
-            aria-label="Send Message"
-          >
-            {isLoading ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-          </button>
-        </form>
-      </footer>
-    </div>
-  );
-};
+                    <footer className="flex-shrink-0 bg-white border-t border-gray-200 p-4 sticky bottom-0 z-10">
+                        <div className="bg-yellow-50 text-yellow-800 p-3 rounded-lg mb-4 text-xs flex items-start shadow-inner">
+                            <Info className="w-4 h-4 flex-shrink-0 mt-0.5 mr-2 text-yellow-600" />
+                            <div>
+                                <strong className="font-semibold">Important Disclaimer:</strong> This AI is for **informational and recreational use only**. It is not a licensed therapist, counselor, or medical professional. If you are experiencing a mental health crisis, please seek professional help immediately.
+                            </div>
+                        </div>
 
-export default App;
+                        <form onSubmit={sendMessage} className="flex space-x-3">
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                disabled={isLoading}
+                                placeholder="Tell me what's on your mind..."
+                                className="flex-grow p-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            />
+                            <button
+                                type="submit"
+                                disabled={!input.trim() || isLoading}
+                                className={`flex items-center justify-center w-12 h-12 rounded-full text-white transition duration-150 ${
+                                  !input.trim() || isLoading
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-lg'
+                                }`}
+                                aria-label="Send Message"
+                            >
+                                {isLoading ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                            </button>
+                        </form>
+                    </footer>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
