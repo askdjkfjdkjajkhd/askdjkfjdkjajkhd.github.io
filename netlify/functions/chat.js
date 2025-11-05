@@ -1,14 +1,17 @@
 // netlify/functions/chat.js
 exports.handler = async (event, context) => {
+  // Set CORS headers for all responses
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  };
+
   // Handle CORS preflight OPTIONS request
   if (event.httpMethod === 'OPTIONS') {
     return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      },
+      statusCode: 204,
+      headers,
       body: ''
     };
   }
@@ -18,8 +21,8 @@ exports.handler = async (event, context) => {
     return {
       statusCode: 405,
       headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        ...headers,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ error: 'Method not allowed' })
     };
@@ -33,7 +36,8 @@ exports.handler = async (event, context) => {
     
     // Check if API key exists
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is not set');
+      console.error('GEMINI_API_KEY not set');
+      throw new Error('API key not configured');
     }
     
     const MODEL_NAME = 'gemini-1.5-flash';
@@ -47,6 +51,8 @@ exports.handler = async (event, context) => {
       }
     };
 
+    console.log('Calling Gemini API...');
+    
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -60,25 +66,24 @@ exports.handler = async (event, context) => {
     }
 
     const data = await response.json();
+    console.log('API call successful');
 
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+        ...headers,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(data)
     };
 
   } catch (error) {
-    console.error('Function error:', error);
+    console.error('Function error:', error.message);
     return {
       statusCode: 500,
       headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        ...headers,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ 
         error: 'Internal server error',
@@ -86,4 +91,3 @@ exports.handler = async (event, context) => {
       })
     };
   }
-};
