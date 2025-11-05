@@ -145,7 +145,7 @@
                     // Call YOUR PHP backend
                     // If chat.php is in same directory as HTML, use './chat.php'
                     // Or use full URL: 'https://yourdomain.com/chat.php'
-                    const result = await handleFetchWithRetry('./chat.php', {
+                    const result = await handleFetchWithRetry('/.netlify/functions/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
