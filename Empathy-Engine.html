@@ -142,8 +142,10 @@
                         systemPrompt: SYSTEM_PROMPT
                     };
 
-                    // Call YOUR backend function instead of Google API directly
-                    const result = await handleFetchWithRetry('/.netlify/functions/chat', {
+                    // Call YOUR PHP backend
+                    // If chat.php is in same directory as HTML, use './chat.php'
+                    // Or use full URL: 'https://yourdomain.com/chat.php'
+                    const result = await handleFetchWithRetry('./chat.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
