@@ -62,7 +62,7 @@ exports.handler = async (event, context) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Google API error:', response.status, errorText);
-      throw new Error(`API error: ${response.status}`);
+      throw new Error(`API error: ${response.status}`); // FIXED: Template literal syntax
     }
 
     const data = await response.json();
@@ -85,9 +85,10 @@ exports.handler = async (event, context) => {
         ...headers,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         error: 'Internal server error',
-        message: error.message 
+        message: error.message
       })
     };
   }
+};
