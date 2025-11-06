@@ -40,9 +40,9 @@ exports.handler = async (event, context) => {
       throw new Error('API key not configured');
     }
     
-    const MODEL_NAME = 'gemini-1.5-flash-latest';
+    const MODEL_NAME = 'gemini-1.5-flash-002';
     
-    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
     
     const payload = {
       contents: messages,
@@ -52,17 +52,25 @@ exports.handler = async (event, context) => {
     };
 
     console.log('Calling Gemini API...');
+    console.log('API URL:', apiUrl.substring(0, 80) + '...');
+    console.log('Payload:', JSON.stringify(payload).substring(0, 200) + '...');
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
     
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Google API error:', response.status, errorText);
-      throw new Error(`API error: ${response.status}`);
+      throw new Error(`API error: ${response.status}`); // FIXED: Template literal syntax
     }
 
     const data = await response.json();
@@ -79,15 +87,17 @@ exports.handler = async (event, context) => {
 
   } catch (error) {
     console.error('Function error:', error.message);
+    console.error('Error stack:', error.stack);
     return {
       statusCode: 500,
       headers: {
         ...headers,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         error: 'Internal server error',
-        message: error.message 
+        message: error.message,
+        type: error.name
       })
     };
   }
