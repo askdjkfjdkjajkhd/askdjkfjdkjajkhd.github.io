@@ -40,9 +40,9 @@ exports.handler = async (event, context) => {
       throw new Error('API key not configured');
     }
     
-    const MODEL_NAME = 'gemini-1.5-flash';
+    const MODEL_NAME = 'gemini-1.5-flash-latest';
     
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
+    const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${MODEL_NAME}:generateContent?key=${apiKey}`;
     
     const payload = {
       contents: messages,
