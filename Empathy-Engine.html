@@ -37,6 +37,7 @@
         const Send = getLucideComponent('Send');
         const Loader = getLucideComponent('Loader');
         const Info = getLucideComponent('Info');
+        const Home = getLucideComponent('Home');
 
         const MAX_RETRIES = 3;
 
@@ -99,6 +100,10 @@
                 }
             };
 
+            const goHome = () => {
+                window.location.href = 'index.html';
+            };
+
             const handleFetchWithRetry = async (url, options) => {
                 let lastError = null;
                 for (let i = 0; i < MAX_RETRIES; i++) {
@@ -142,9 +147,6 @@
                         systemPrompt: SYSTEM_PROMPT
                     };
 
-                    // Call YOUR PHP backend
-                    // If chat.php is in same directory as HTML, use './chat.php'
-                    // Or use full URL: 'https://yourdomain.com/chat.php'
                     const result = await handleFetchWithRetry('https://magenta-faun-fdb1dc.netlify.app/.netlify/functions/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -183,15 +185,26 @@
                         <h1 className="text-xl font-bold tracking-tight md:text-2xl">
                             The Empathy Engine
                         </h1>
-                        <button
-                            onClick={resetChat}
-                            className="flex items-center text-sm bg-blue-700 hover:bg-blue-800 transition duration-150 rounded-full px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            aria-label="Start a new chat"
-                            title="Start New Session"
-                        >
-                            <RefreshCw className="w-4 h-4 mr-1" />
-                            New Session
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={goHome}
+                                className="flex items-center text-sm bg-blue-700 hover:bg-blue-800 transition duration-150 rounded-full px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                aria-label="Go to home page"
+                                title="Home"
+                            >
+                                <Home className="w-4 h-4 mr-1" />
+                                Home
+                            </button>
+                            <button
+                                onClick={resetChat}
+                                className="flex items-center text-sm bg-blue-700 hover:bg-blue-800 transition duration-150 rounded-full px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                aria-label="Start a new chat"
+                                title="Start New Session"
+                            >
+                                <RefreshCw className="w-4 h-4 mr-1" />
+                                New Session
+                            </button>
+                        </div>
                     </header>
 
                     <main className="flex-grow overflow-y-auto p-4 md:p-6 pb-28 space-y-4">
